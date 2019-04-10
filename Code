@@ -1,0 +1,63 @@
+# clear environment and set working directory
+rm(list =ls())
+setwd("C:/Users/lucyc/Downloads/Kaggle")
+# load analysis data
+data = read.csv('analysisData.csv')
+dim(data)
+# Examine the price data - it is in currency format ($ and ,)
+head(data$price)
+# look at gsub to convert the price to eliminate the $ and ,
+head(as.numeric(gsub('[$,]', '', data$price)))
+# update the price using gsub
+data$price = as.numeric(gsub('[$,]', '', data$price))
+# we are going to construct a linear model using only two variables:
+# minimum_nights and review_scores_rating
+
+# But first, count how many NAs there are in the columns of interest
+sum(is.na(data$price))
+sum(is.na(data$minimum_nights))
+sum(is.na(data$review_scores_rating))
+
+# there are 5885 NAs in the review_scores_rating
+# let's replace them with the average value
+# calculate the average (excluding NAs)
+avg_review_scores_rating = mean(data$review_scores_rating, na.rm = T)
+avg_review_scores_rating
+
+# Replace the NAs with the avg value:
+# this is the preprocessing step that will also
+# need to be applied to the scoring data!!
+mask_NAs = is.na(data$review_scores_rating)
+data[mask_NAs, 'review_scores_rating'] = avg_review_scores_rating
+
+# check if we got rid of the NAs (this should return TRUE)
+sum(is.na(data$review_scores_rating)) == 0
+
+# check if the column average did not change (this should return TRUE)
+mean(data$review_scores_rating, na.rm = T) == avg_review_scores_rating
+
+# now that the data is clean, train the first model
+model = lm(price ~ minimum_nights + review_scores_rating, data)
+
+# if you run summary(model) you'll see that the R-squared is
+# super low - this is not a good model :)
+
+# load scoring data
+scoringData = read.csv('scoringData.csv')
+
+# apply preprocessing step to the scoring data (before applying model)
+# note we are replacing missing values in scoringData with values
+# from training data!!
+mask_NAs = is.na(scoringData$review_scores_rating)
+scoringData[mask_NAs, 'review_scores_rating'] = avg_review_scores_rating
+
+# verify that there are no NAs (this should return TRUE)
+sum(is.na(scoringData$review_scores_rating)) == 0
+
+# score the data
+pred = predict(model, newdata=scoringData)
+submission = data.frame(id = scoringData$id, price = pred) 
+# check if submission data.frame has no NAs (this should return TRUE)
+sum(is.na(submission)) == 0
+# write results to a csv file to upload to Kaggle
+write.csv(submission, 'sample_submission.csv',row.names = F)
